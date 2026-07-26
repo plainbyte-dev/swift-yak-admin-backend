@@ -32,6 +32,51 @@ const userSchema = new mongoose.Schema(
       default: 'Meridian Logistics Co.',
       trim: true,
     },
+     phone: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    timezone: {
+      type: String,
+      default: 'America/New_York',
+    },
+    language: {
+      type: String,
+      default: 'English (US)',
+    },
+    dateFormat: {
+      type: String,
+      default: 'MM/DD/YYYY',
+    },
+    timeFormat: {
+      type: String,
+      default: '12-hour (AM/PM)',
+    },
+     theme: {
+      type: String,
+      enum: ['light', 'dark', 'system'],
+      default: 'system',
+    },
+    avatarUrl: {
+      type: String,
+      default: null,
+    },
+    twoFactorEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    twoFactorSecret: {
+      type: String,
+      select: false, // don't return by default, same treatment as password
+    },
+    notifications: {
+      newShipment: { type: Boolean, default: true },
+      statusUpdate: { type: Boolean, default: true },
+      courierAlert: { type: Boolean, default: true },
+      weeklyReport: { type: Boolean, default: false },
+      smsAlerts: { type: Boolean, default: false },
+    },
     isActive: {
       type: Boolean,
       default: true,
@@ -57,7 +102,7 @@ userSchema.methods.comparePassword = function comparePassword(candidate) {
 
 userSchema.methods.toSafeObject = function toSafeObject() {
   return {
-    id: this._id,
+    _id: this._id,
     name: this.name,
     email: this.email,
     role: this.role,
@@ -65,6 +110,15 @@ userSchema.methods.toSafeObject = function toSafeObject() {
     isActive: this.isActive,
     lastLoginAt: this.lastLoginAt,
     createdAt: this.createdAt,
+    phone: this.phone,
+    timezone: this.timezone,
+    language: this.language,
+    dateFormat: this.dateFormat,
+    timeFormat: this.timeFormat,
+    theme: this.theme,
+    avatarUrl: this.avatarUrl,
+    twoFactorEnabled: this.twoFactorEnabled,
+    notifications: this.notifications,
   };
 };
 export default mongoose.model('User', userSchema);

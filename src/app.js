@@ -12,7 +12,9 @@ import companyRoutes from './routes/companyRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import reportsRoutes from './routes/reportsRoute.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
+import dotenv from 'dotenv';
 
+dotenv.config();
 const app = express();
 
 app.use(helmet());
@@ -64,5 +66,6 @@ app.use('/api/users', userRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use(notFound);
 app.use(errorHandler);
+app.use('/uploads', express.static('uploads'));
 
 export default app;
