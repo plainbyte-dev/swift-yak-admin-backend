@@ -11,13 +11,34 @@ import metricsRoutes from './routes/metricsRoutes.js';
 import companyRoutes from './routes/companyRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import reportsRoutes from './routes/reportsRoute.js';
+import bookingRequestRoutes from './routes/bookingRequestRoutes.js';
+import publicRoutes from './routes/publicRoutes.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
 const app = express();
 
-app.use(helmet());
+const corsOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        connectSrc: ["'self'", ...corsOrigins],
+        imgSrc: ["'self'", 'data:', 'https://res.cloudinary.com'],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+  })
+);
 app.use(express.json());
 
 app.get('/',(req, res) => {
@@ -26,14 +47,9 @@ app.get('/',(req, res) => {
     })
 })
 
-const allowedOrigins = (process.env.CORS_ORIGIN || '')
-  .split(',')
-  .map((o) => o.trim())
-  .filter(Boolean);
-
 app.use(
   cors({
-    origin: allowedOrigins.length ? allowedOrigins : '*',
+    origin: corsOrigins.length ? corsOrigins : '*',
     credentials: true,
   })
 );
@@ -64,6 +80,8 @@ app.use('/api/metrics', metricsRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/booking-requests', bookingRequestRoutes);
+app.use('/api/public', publicRoutes);
 app.use(notFound);
 app.use(errorHandler);
 app.use('/uploads', express.static('uploads'));

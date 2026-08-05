@@ -3,6 +3,33 @@ import User from '../models/User.js';
 
 const ALLOWED_ROLES = ['admin', 'dispatcher', 'viewer'];
 
+// @desc    Create a user account. This is the only way to provision an
+//          account — there is no public self-registration route.
+// @route   POST /api/users
+// @access  Private (admin only)
+export const createUser = asyncHandler(async (req, res) => {
+  const { name, email, password, role, company } = req.body;
+
+  if (!name || !email || !password) {
+    res.status(400);
+    throw new Error('name, email, and password are required');
+  }
+
+  if (role !== undefined && !ALLOWED_ROLES.includes(role)) {
+    res.status(400);
+    throw new Error(`role must be one of: ${ALLOWED_ROLES.join(', ')}`);
+  }
+
+  const existing = await User.findOne({ email: email.toLowerCase() });
+  if (existing) {
+    res.status(409);
+    throw new Error('An account with that email already exists');
+  }
+
+  const user = await User.create({ name, email, password, role, company });
+  res.status(201).json({ success: true, data: user.toSafeObject() });
+});
+
 // @desc    List users — search, role filter, paginate
 // @route   GET /api/users?search=&role=&page=&perPage=
 // @access  Private (admin only)

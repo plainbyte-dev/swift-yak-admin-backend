@@ -1,11 +1,11 @@
 import asyncHandler from 'express-async-handler';
 import Shipment, { SHIPMENT_STATUSES, STATUS_TRANSITIONS } from '../models/Shipment.js';
 import Courier from '../models/Courier.js';
-
-function generateTrackingNumber() {
-  const rand = Math.floor(10000 + Math.random() * 90000);
-  return `CDK-${rand}`;
-}
+import {
+  generateUniqueTrackingNumber,
+  generateUniqueHouseBill,
+  calculateShipmentPrice,
+} from '../utils/shipmentHelpers.js';
 
 // @desc    List shipments — search, status filter, sort, paginate
 //          (mirrors the search/filter/sort/pagination in RecentShipmentsTable.tsx)
@@ -99,25 +99,19 @@ export const getShipment = asyncHandler(async (req, res) => {
 // @route   POST /api/shipments
 // @access  Private (admin, dispatcher)
 export const createShipment = asyncHandler(async (req, res) => {
-  const { recipient, origin, destination, weightKg, phone, notes, eta } = req.body;
+  const {
+    recipient, origin, destination, weightKg, phone, notes, eta,
+    sender, consignee, freight,
+  } = req.body;
 
   if (!recipient || !origin || !destination || weightKg === undefined) {
     res.status(400);
     throw new Error('recipient, origin, destination, and weightKg are required');
   }
 
-  let trackingNumber = generateTrackingNumber();
-  // Guard against the (unlikely) random collision.
-  while (await Shipment.exists({ trackingNumber })) {
-    trackingNumber = generateTrackingNumber();
-  }
-
-  // Price is a snapshot computed at creation time — deliberately not
-  // recalculated later, so historical revenue in /api/reports stays stable
-  // even if these rates change down the line.
-  const BASE_PRICE = 5;
-  const PER_KG_RATE = 1.5;
-  const price = BASE_PRICE + weightKg * PER_KG_RATE;
+  const trackingNumber = await generateUniqueTrackingNumber();
+  const houseBill = await generateUniqueHouseBill();
+  const price = calculateShipmentPrice(weightKg);
 
   const shipment = await Shipment.create({
     trackingNumber,
@@ -132,6 +126,9 @@ export const createShipment = asyncHandler(async (req, res) => {
     createdBy: req.user._id,
     status: 'pending',
     statusHistory: [{ status: 'pending' }],
+    sender,
+    consignee,
+    freight: { ...freight, houseBill },
   });
 
   res.status(201).json({ success: true, data: shipment });
@@ -141,7 +138,10 @@ export const createShipment = asyncHandler(async (req, res) => {
 // @route   PATCH /api/shipments/:id
 // @access  Private (admin, dispatcher)
 export const updateShipment = asyncHandler(async (req, res) => {
-  const { recipient, origin, destination, weightKg, phone, notes, eta } = req.body;
+  const {
+    recipient, origin, destination, weightKg, phone, notes, eta,
+    sender, consignee, freight,
+  } = req.body;
 
   const shipment = await Shipment.findById(req.params.id);
   if (!shipment) {
@@ -156,6 +156,21 @@ export const updateShipment = asyncHandler(async (req, res) => {
   if (phone !== undefined) shipment.phone = phone;
   if (notes !== undefined) shipment.notes = notes;
   if (eta !== undefined) shipment.eta = eta;
+
+  if (sender !== undefined) {
+    shipment.sender = { ...(shipment.sender?.toObject?.() ?? shipment.sender ?? {}), ...sender };
+  }
+  if (consignee !== undefined) {
+    shipment.consignee = { ...(shipment.consignee?.toObject?.() ?? shipment.consignee ?? {}), ...consignee };
+  }
+  if (freight !== undefined) {
+    // houseBill is assigned once at creation and never overwritten via this route.
+    const { houseBill: _ignoredHouseBill, ...editableFreight } = freight;
+    shipment.freight = {
+      ...(shipment.freight?.toObject?.() ?? shipment.freight ?? {}),
+      ...editableFreight,
+    };
+  }
 
   await shipment.save();
   res.json({ success: true, data: shipment });
